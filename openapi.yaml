@@ -1,1 +1,1074 @@
-openapi.yaml
+openapi: 3.1.0
+info:
+  title: Registry Bias Index Automation API
+  version: 1.0.0
+  description: |
+    API schema for orchestrating the Registry Bias Index workflows within Relevance AI.
+    The specification models the multi-agent system described in the project brief,
+    covering ingestion, standardisation, analytics, visualisation, report generation,
+    and outreach scheduling steps.
+servers:
+  - url: https://api.registrybiasindex.org/v1
+    description: Production environment
+  - url: https://staging.api.registrybiasindex.org/v1
+    description: Staging environment
+paths:
+  /registry-sources:
+    get:
+      summary: List registry data sources
+      description: Retrieve configured registry sources, optionally filtered by state.
+      tags: [Data Aggregation]
+      parameters:
+        - in: query
+          name: state
+          schema:
+            type: string
+            minLength: 2
+          description: Two-letter state code to filter sources.
+      responses:
+        '200':
+          description: A list of registry sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrySourceList'
+    post:
+      summary: Register a new state registry source
+      description: Add a new registry source definition to be used by the ingestion workflow.
+      tags: [Data Aggregation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrySourceCreateRequest'
+      responses:
+        '201':
+          description: Registry source created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrySource'
+        '400':
+          description: Invalid payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /registry-sources/{sourceId}:
+    get:
+      summary: Retrieve a registry source
+      tags: [Data Aggregation]
+      parameters:
+        - $ref: '#/components/parameters/SourceIdParam'
+      responses:
+        '200':
+          description: Registry source details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrySource'
+        '404':
+          description: Source not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      summary: Update a registry source
+      tags: [Data Aggregation]
+      parameters:
+        - $ref: '#/components/parameters/SourceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrySourceUpdateRequest'
+      responses:
+        '200':
+          description: Updated registry source.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrySource'
+        '400':
+          description: Invalid update payload.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Source not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Delete a registry source
+      tags: [Data Aggregation]
+      parameters:
+        - $ref: '#/components/parameters/SourceIdParam'
+      responses:
+        '204':
+          description: Source deleted.
+        '404':
+          description: Source not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /ingestions:
+    post:
+      summary: Trigger a new ingestion run
+      description: Kick off the external scraping workflow for a registry source.
+      tags: [Data Aggregation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestionTriggerRequest'
+      responses:
+        '202':
+          description: Ingestion run accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionRun'
+        '404':
+          description: Registry source not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /ingestions/{ingestionId}:
+    get:
+      summary: Get ingestion run status
+      tags: [Data Aggregation]
+      parameters:
+        - $ref: '#/components/parameters/IngestionIdParam'
+      responses:
+        '200':
+          description: Ingestion run details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestionRun'
+        '404':
+          description: Ingestion run not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /standardizations:
+    post:
+      summary: Start data standardisation
+      description: Start an AI-powered standardisation batch against a completed ingestion run.
+      tags: [Data Standardisation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StandardizationRequest'
+      responses:
+        '202':
+          description: Standardisation batch accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardizationBatch'
+        '404':
+          description: Ingestion run not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /standardizations/{batchId}:
+    get:
+      summary: Get standardisation batch
+      tags: [Data Standardisation]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdParam'
+      responses:
+        '200':
+          description: Batch details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardizationBatch'
+        '404':
+          description: Batch not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /standardizations/{batchId}/records:
+    get:
+      summary: List standardised records
+      tags: [Data Standardisation]
+      parameters:
+        - $ref: '#/components/parameters/BatchIdParam'
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for paginated responses.
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+          description: Number of records per page.
+      responses:
+        '200':
+          description: A page of standardised records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardizedRecordPage'
+        '404':
+          description: Batch not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /analytics/disparities:
+    post:
+      summary: Generate disparity analysis
+      description: Run the analytics workflow to compute disparity metrics and qualitative insights.
+      tags: [Analytics]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisparityAnalysisRequest'
+      responses:
+        '200':
+          description: Disparity analysis completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisparityAnalysisResponse'
+        '400':
+          description: Invalid analysis configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /visualizations/maps:
+    post:
+      summary: Generate a geospatial map visualisation
+      description: Create a map artifact for the standardised dataset using the visualisation workflow.
+      tags: [Visualisations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MapVisualizationRequest'
+      responses:
+        '202':
+          description: Map generation accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisualizationArtifact'
+        '404':
+          description: Dataset not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /visualizations/{artifactId}:
+    get:
+      summary: Get visualisation artifact
+      tags: [Visualisations]
+      parameters:
+        - $ref: '#/components/parameters/ArtifactIdParam'
+      responses:
+        '200':
+          description: Visualisation artifact details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisualizationArtifact'
+        '404':
+          description: Artifact not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /reports:
+    post:
+      summary: Generate stakeholder reports
+      description: Produce personalised reports or email drafts for stakeholders from the findings dataset.
+      tags: [Reporting]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '202':
+          description: Report generation accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDocument'
+        '404':
+          description: Findings dataset not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /reports/{reportId}:
+    get:
+      summary: Get generated report
+      tags: [Reporting]
+      parameters:
+        - $ref: '#/components/parameters/ReportIdParam'
+      responses:
+        '200':
+          description: Report details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDocument'
+        '404':
+          description: Report not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /outreach/schedule:
+    post:
+      summary: Schedule outreach delivery
+      description: Schedule the delivery of generated reports via email or alternative channels.
+      tags: [Outreach]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OutreachScheduleRequest'
+      responses:
+        '202':
+          description: Outreach scheduled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutreachStatus'
+        '404':
+          description: Related report or stakeholder not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /outreach/{outreachId}:
+    get:
+      summary: Get outreach status
+      tags: [Outreach]
+      parameters:
+        - $ref: '#/components/parameters/OutreachIdParam'
+      responses:
+        '200':
+          description: Outreach status details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OutreachStatus'
+        '404':
+          description: Outreach record not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  parameters:
+    SourceIdParam:
+      name: sourceId
+      in: path
+      required: true
+      description: Unique identifier of the registry source.
+      schema:
+        type: string
+    IngestionIdParam:
+      name: ingestionId
+      in: path
+      required: true
+      description: Unique identifier of the ingestion run.
+      schema:
+        type: string
+    BatchIdParam:
+      name: batchId
+      in: path
+      required: true
+      description: Unique identifier of the standardisation batch.
+      schema:
+        type: string
+    ArtifactIdParam:
+      name: artifactId
+      in: path
+      required: true
+      description: Unique identifier of the visualisation artifact.
+      schema:
+        type: string
+    ReportIdParam:
+      name: reportId
+      in: path
+      required: true
+      description: Unique identifier of the report document.
+      schema:
+        type: string
+    OutreachIdParam:
+      name: outreachId
+      in: path
+      required: true
+      description: Unique identifier of the outreach workflow.
+      schema:
+        type: string
+  schemas:
+    RegistrySourceList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistrySource'
+        nextPageToken:
+          type: string
+          nullable: true
+          description: Token for fetching the next page of results.
+    RegistrySource:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier assigned to the registry source.
+        state:
+          type: string
+          description: Two-letter state code for the source.
+        registryUrl:
+          type: string
+          format: uri
+          description: Primary public data URL for the registry.
+        dataFormat:
+          type: string
+          description: Expected format of the registry data.
+          enum: [HTML, CSV, JSON, XML, PDF, API]
+        schedule:
+          type: string
+          description: Cron-style schedule for the ingestion workflow.
+        lastScrapedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the most recent completed ingestion.
+        notes:
+          type: string
+          description: Free-form notes or scraping instructions.
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional configuration details for the source.
+      required: [id, state, registryUrl]
+    RegistrySourceCreateRequest:
+      type: object
+      properties:
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Two-letter state code for the source.
+        registryUrl:
+          type: string
+          format: uri
+          description: Public registry URL to scrape.
+        dataFormat:
+          type: string
+          enum: [HTML, CSV, JSON, XML, PDF, API]
+        schedule:
+          type: string
+          description: Cron-style schedule for ingestion.
+        notes:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+      required: [state, registryUrl]
+    RegistrySourceUpdateRequest:
+      type: object
+      properties:
+        registryUrl:
+          type: string
+          format: uri
+        dataFormat:
+          type: string
+          enum: [HTML, CSV, JSON, XML, PDF, API]
+        schedule:
+          type: string
+        notes:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    IngestionTriggerRequest:
+      type: object
+      properties:
+        sourceId:
+          type: string
+          description: Registry source identifier to ingest.
+        runMode:
+          type: string
+          enum: [manual, scheduled]
+          default: manual
+        initiatedBy:
+          type: string
+          description: Identity of the human or agent triggering the run.
+        notes:
+          type: string
+        outputFolderId:
+          type: string
+          description: Google Drive folder ID where raw files should be stored.
+      required: [sourceId]
+    IngestionRun:
+      type: object
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rawDataFiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataFile'
+        logLocation:
+          type: string
+          format: uri
+          description: Location of the ingestion logs.
+        metrics:
+          $ref: '#/components/schemas/IngestionMetrics'
+        notes:
+          type: string
+      required: [id, sourceId, status, startedAt]
+    DataFile:
+      type: object
+      properties:
+        fileId:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        storageUri:
+          type: string
+          format: uri
+      required: [fileId, fileName, storageUri]
+    IngestionMetrics:
+      type: object
+      properties:
+        recordsDiscovered:
+          type: integer
+          minimum: 0
+        bytesDownloaded:
+          type: integer
+          format: int64
+          minimum: 0
+      additionalProperties: false
+    StandardizationRequest:
+      type: object
+      properties:
+        ingestionId:
+          type: string
+        schemaVersion:
+          type: string
+          default: 1.0
+        mappingProfileId:
+          type: string
+          description: Identifier for the offense mapping profile to use.
+        aiModel:
+          type: string
+          description: AI model identifier to use for standardisation prompts.
+        instructions:
+          type: string
+          description: Additional prompt instructions for the AI agent.
+        outputDatasetId:
+          type: string
+          description: Target Google Sheet or BigQuery table identifier.
+        validationRules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationRule'
+      required: [ingestionId]
+    ValidationRule:
+      type: object
+      properties:
+        field:
+          type: string
+          description: Field name to validate.
+        ruleType:
+          type: string
+          enum: [required, enum, regex, range, unique, customPrompt]
+        ruleValue:
+          description: Optional rule definition, type varies by ruleType.
+          oneOf:
+            - type: string
+            - type: number
+            - type: array
+              items:
+                type: string
+            - type: object
+        message:
+          type: string
+          description: Custom validation failure message.
+      required: [field, ruleType]
+    StandardizationBatch:
+      type: object
+      properties:
+        id:
+          type: string
+        ingestionId:
+          type: string
+        status:
+          type: string
+          enum: [queued, running, completed, failed]
+        recordsProcessed:
+          type: integer
+          minimum: 0
+        recordsErrored:
+          type: integer
+          minimum: 0
+        outputDatasetId:
+          type: string
+        auditTrailUri:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, ingestionId, status, createdAt]
+    StandardizedRecordPage:
+      type: object
+      properties:
+        batchId:
+          type: string
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalRecords:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StandardizedRecord'
+      required: [batchId, page, pageSize, totalRecords, items]
+    StandardizedRecord:
+      type: object
+      properties:
+        recordId:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        race:
+          type: string
+        gender:
+          type: string
+          nullable: true
+        address:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zipCode:
+          type: string
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        offenseType:
+          type: string
+        riskTier:
+          type: string
+        registrationDate:
+          type: string
+          format: date
+          nullable: true
+        sourceRegistry:
+          type: string
+        originalRecordRef:
+          type: string
+          description: Identifier to trace back to the raw data.
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [recordId, firstName, lastName, state, offenseType, riskTier, sourceRegistry]
+    DisparityAnalysisRequest:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [state, national, custom]
+          default: state
+        state:
+          type: string
+          description: Two-letter state code to analyse when scope is state.
+        censusDatasetId:
+          type: string
+          description: Identifier for the census or demographic dataset to join.
+        demographicBreakdowns:
+          type: array
+          items:
+            type: string
+          description: Dimensions to group disparity metrics by (e.g., race, gender, income).
+        filters:
+          type: object
+          additionalProperties: true
+          description: Filter criteria applied to the registry dataset.
+        includeTrendAnalysis:
+          type: boolean
+          default: false
+        outputSheetId:
+          type: string
+          description: Optional Google Sheet ID for storing supporting tables.
+      required: [scope]
+    DisparityMetric:
+      type: object
+      properties:
+        dimension:
+          type: string
+        group:
+          type: string
+        registryPercentage:
+          type: number
+          format: double
+        populationPercentage:
+          type: number
+          format: double
+        disparityRatio:
+          type: number
+          format: double
+        absoluteDifference:
+          type: number
+          format: double
+        supportingCount:
+          type: integer
+      required: [dimension, group, registryPercentage, populationPercentage, disparityRatio]
+    DisparityAnalysisResponse:
+      type: object
+      properties:
+        analysisId:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        scope:
+          type: string
+        state:
+          type: string
+          nullable: true
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisparityMetric'
+        keyFindings:
+          type: array
+          items:
+            type: string
+          description: AI-generated bullet point summaries of the analysis.
+        supportingDataSheetId:
+          type: string
+          nullable: true
+        insightsDocumentUri:
+          type: string
+          format: uri
+          nullable: true
+      required: [analysisId, generatedAt, scope, metrics, keyFindings]
+    MapVisualizationRequest:
+      type: object
+      properties:
+        datasetId:
+          type: string
+          description: Identifier of the standardised dataset to visualise.
+        geoFieldMapping:
+          type: object
+          properties:
+            latitudeField:
+              type: string
+            longitudeField:
+              type: string
+            zipField:
+              type: string
+          additionalProperties: false
+        styleOptions:
+          type: object
+          properties:
+            colorBy:
+              type: string
+            clusterMarkers:
+              type: boolean
+              default: true
+            theme:
+              type: string
+          additionalProperties: true
+        outputFormat:
+          type: string
+          enum: [html, json, png]
+          default: html
+        sharingOptions:
+          type: object
+          properties:
+            driveFolderId:
+              type: string
+            accessLevel:
+              type: string
+              enum: [private, organisation, public]
+          additionalProperties: false
+        includeDemographics:
+          type: boolean
+          default: true
+      required: [datasetId]
+    VisualizationArtifact:
+      type: object
+      properties:
+        artifactId:
+          type: string
+        status:
+          type: string
+          enum: [queued, generating, available, failed]
+        downloadUrl:
+          type: string
+          format: uri
+          nullable: true
+        previewUrl:
+          type: string
+          format: uri
+          nullable: true
+        generatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [artifactId, status]
+    StakeholderProfile:
+      type: object
+      properties:
+        stakeholderId:
+          type: string
+        name:
+          type: string
+        organisation:
+          type: string
+        role:
+          type: string
+        state:
+          type: string
+        email:
+          type: string
+          format: email
+        interests:
+          type: array
+          items:
+            type: string
+        preferredTone:
+          type: string
+          enum: [formal, persuasive, empathetic, neutral]
+      required: [stakeholderId, name, state]
+    ReportRequest:
+      type: object
+      properties:
+        stakeholders:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/StakeholderProfile'
+        findingsSheetId:
+          type: string
+        summaryPoints:
+          type: array
+          items:
+            type: string
+        includeVisualizations:
+          type: array
+          items:
+            type: string
+          description: List of visualisation artifact IDs to embed.
+        personalizationInstructions:
+          type: string
+        deliveryFormat:
+          type: string
+          enum: [google_doc, pdf, html, email]
+          default: google_doc
+        reviewRequired:
+          type: boolean
+          default: true
+      required: [stakeholders, findingsSheetId]
+    ReportDocument:
+      type: object
+      properties:
+        reportId:
+          type: string
+        status:
+          type: string
+          enum: [queued, drafting, ready_for_review, approved, failed]
+        findingsSheetId:
+          type: string
+        stakeholders:
+          type: array
+          items:
+            $ref: '#/components/schemas/StakeholderDelivery'
+        documentLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentLink'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+      required: [reportId, status, stakeholders]
+    StakeholderDelivery:
+      type: object
+      properties:
+        stakeholder:
+          $ref: '#/components/schemas/StakeholderProfile'
+        documentUri:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum: [draft, ready_to_send, sent, failed]
+        scheduledSendAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [stakeholder, status]
+    DocumentLink:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [google_doc, pdf, html, email_body]
+        uri:
+          type: string
+          format: uri
+        description:
+          type: string
+      required: [type, uri]
+    OutreachScheduleRequest:
+      type: object
+      properties:
+        reportId:
+          type: string
+        stakeholderId:
+          type: string
+        sendMethod:
+          type: string
+          enum: [email, manual, webhook]
+          default: email
+        scheduleAt:
+          type: string
+          format: date-time
+        emailSubject:
+          type: string
+        emailPreviewText:
+          type: string
+        cc:
+          type: array
+          items:
+            type: string
+            format: email
+        bcc:
+          type: array
+          items:
+            type: string
+            format: email
+        attachments:
+          type: array
+          items:
+            type: string
+            description: Attachment IDs or URIs.
+        requireApproval:
+          type: boolean
+          default: true
+      required: [reportId, stakeholderId]
+    OutreachStatus:
+      type: object
+      properties:
+        outreachId:
+          type: string
+        reportId:
+          type: string
+        stakeholderId:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, pending_approval, sent, failed]
+        scheduleAt:
+          type: string
+          format: date-time
+          nullable: true
+        sentAt:
+          type: string
+          format: date-time
+          nullable: true
+        failureReason:
+          type: string
+          nullable: true
+      required: [outreachId, status]
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+      required: [code, message]
